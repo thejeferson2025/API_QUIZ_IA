@@ -1,0 +1,43 @@
+# ==========================================
+# Variables de entorno y secretos (¡CRÍTICO!)
+# ==========================================
+.env
+
+# ==========================================
+# Entornos virtuales
+# ==========================================
+.venv/
+venv/
+env/
+
+# ==========================================
+# Base de datos local
+# ==========================================
+db.sqlite3
+*.sqlite3
+
+# ==========================================
+# Archivos compilados de Python y Caché
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ==========================================
+# Archivos subidos temporalmente o multimedia
+# ==========================================
+# Ignoramos los videos para no subir archivos pesados a GitHub
+*.mp4
+*.avi
+*.mov
+media/
+tmp/
+
+# ==========================================
+# Configuraciones del editor (VS Code, etc) y SO
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
