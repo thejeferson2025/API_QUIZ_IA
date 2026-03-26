@@ -79,12 +79,27 @@ WSGI_APPLICATION = 'gemini_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# --- Base de Datos: SQL Server ---
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mssql',
+        'NAME': 'process-ia-video',
+        'USER': 'sa',
+        'PASSWORD': '2025',
+        'HOST': r'DESKTOP-J3VGBST\MSSQLSERVER1',
+        'PORT': '1433',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'extra_params': 'Trusted_Connection=yes;'
+        },
     }
 }
+
+# --- Configuración de Celery ---
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 
 # Password validation
