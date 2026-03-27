@@ -11,7 +11,7 @@ from .models import VideoQuiz
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODELO_ELEGIDO = os.getenv("GEMINI_MODEL")
+MODELO_ELEGIDO = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 client = genai.Client(api_key=API_KEY)
 
@@ -22,87 +22,88 @@ class PreguntaInteractiva(BaseModel):
     opciones: list[str]
     respuesta_correcta: str
 
-def comprimir_video_ffmpeg(input_path):
+def extraer_audio_ffmpeg(input_path):
     """
-    Comprime el video a 360p, 2 fotogramas por segundo, preservando el audio original.
-    Devuelve la ruta del nuevo archivo comprimido.
+    Extrae únicamente la pista de audio del video y la guarda como MP3.
     """
-    # Generamos un nuevo nombre para el archivo comprimido
-    output_path = input_path.replace('.mp4', '_comprimido.mp4')
+    # Generamos el nombre del archivo de salida pero con extensión .mp3
+    output_path = input_path.replace('.mp4', '.mp3')
     
-    # Comando mágico de FFmpeg
     comando = [
         'ffmpeg',
         '-y',                 # Sobrescribir si existe
-        '-i', input_path,     # Archivo de entrada
-        '-vf', 'scale=-2:360',# Reducir resolución a 360p (mantiene proporción)
-        '-r', '2',            # Bajar a 2 FPS (Gemini no necesita más para entender el contexto)
-        '-c:v', 'libx264',    # Codec de video estándar
-        '-preset', 'ultrafast',# Comprimir lo más rápido posible, sin importar si no es "perfecto"
-        '-crf', '28',         # Calidad visual baja (ahorra mucho peso)
-        '-c:a', 'copy',       # COPIAR el audio original (esencial para no perder tiempo re-codificando el audio)
+        '-i', input_path,     # Archivo de entrada (.mp4)
+        '-q:a', '0',          # Mantener la mejor calidad de audio posible
+        '-map', 'a',          # Mapear/Extraer SOLO el canal de audio
         output_path
     ]
     
     try:
-        # Ejecutamos el comando en la consola de forma silenciosa
         subprocess.run(comando, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return output_path
     except subprocess.CalledProcessError as e:
-        # Si FFmpeg falla, lanzamos el error con los detalles
         error_msg = e.stderr.decode('utf-8')
-        raise Exception(f"Error comprimiendo el video con FFmpeg: {error_msg}")
-
+        raise Exception(f"Error extrayendo el audio con FFmpeg: {error_msg}")
 
 @shared_task
-def procesar_video_gemini(video_quiz_id, file_path):
+def procesar_video_gemini(video_quiz_id, file_path, num_preguntas=4):
     quiz_record = VideoQuiz.objects.get(id=video_quiz_id)
+    
+    # --- ESCUDO PROTECTOR CONTRA EJECUCIONES FANTASMAS ---
+    if quiz_record.status == 'COMPLETED':
+        return "El video ya fue procesado exitosamente. Evitando re-ejecución."
+    # -----------------------------------------------------
+
+    # Limpiamos posibles errores anteriores si es un reintento legítimo
     quiz_record.status = 'PROCESSING'
+    quiz_record.error_message = None 
     quiz_record.save()
 
-    compressed_file_path = None
+    audio_file_path = None
 
     try:
-        # 1. Comprimimos el video primero
-        compressed_file_path = comprimir_video_ffmpeg(file_path)
+        audio_file_path = extraer_audio_ffmpeg(file_path)
+        file_upload = client.files.upload(file=audio_file_path)
         
-        # 2. Subimos el video COMPRIMIDO a Gemini
-        video_upload = client.files.upload(file=compressed_file_path)
-        
-        # 3. Esperamos a que Google procese el video
-        while video_upload.state.name == "PROCESSING":
-            time.sleep(5) 
-            video_upload = client.files.get(name=video_upload.name)
+        while file_upload.state.name == "PROCESSING":
+            time.sleep(3) 
+            file_upload = client.files.get(name=file_upload.name)
             
-        if video_upload.state.name == "FAILED":
-            raise Exception("El procesamiento del video falló en los servidores de Google.")
+        if file_upload.state.name == "FAILED":
+            raise Exception("El procesamiento del archivo falló en los servidores de Google.")
 
-        # 4. Generamos el contenido
-        prompt = """
-        Eres un asistente educativo. Analiza este video detalladamente.
+        prompt = f"""
+        Eres un asistente educativo. A continuación recibirás la grabación de audio completa de una clase.
         Tu objetivo es crear una "lección interactiva" para mantener la concentración del estudiante.
-        Genera 4 preguntas de opción múltiple. Cada pregunta debe estar anclada a un momento específico del video (un 'timestamp'). 
-        La pregunta debe evaluar algo que se acaba de explicar en los segundos o minutos previos a ese timestamp.
+        Genera EXACTAMENTE {num_preguntas} preguntas de opción múltiple. 
+        
+        REGLA CRÍTICA DE DISTRIBUCIÓN:
+        Las preguntas DEBEN estar distribuidas cronológicamente y de manera uniforme a lo largo de TODO el tiempo que dura el audio.
+        NO agrupes las preguntas en los primeros minutos.
+        
+        Instrucción estricta: Divide mentalmente la duración total del audio en {num_preguntas} fragmentos de tiempo iguales. Debes extraer exactamente una (1) pregunta del tema principal hablado en cada uno de esos fragmentos. 
+        Por ejemplo, si pido 3 preguntas, saca una del inicio, una del medio y una del final.
+        
+        Cada pregunta debe estar anclada al momento exacto (timestamp) donde se dio la explicación en el audio.
         """
         
         response = client.models.generate_content(
             model=MODELO_ELEGIDO,
-            contents=[video_upload, prompt],
+            contents=[file_upload, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=list[PreguntaInteractiva],
-                temperature=0.2
+                temperature=0.2 
             )
         )
         
         datos_json = json.loads(response.text)
         
         try:
-            client.files.delete(name=video_upload.name)
+            client.files.delete(name=file_upload.name)
         except:
             pass
         
-        # 5. Guardamos el resultado exitoso
         quiz_record.quiz_data = datos_json
         quiz_record.status = 'COMPLETED'
         quiz_record.save()
@@ -113,8 +114,7 @@ def procesar_video_gemini(video_quiz_id, file_path):
         quiz_record.save()
     
     finally:
-        # Limpieza: Borramos el original Y el comprimido de tu disco duro
         if os.path.exists(file_path):
             os.remove(file_path)
-        if compressed_file_path and os.path.exists(compressed_file_path):
-            os.remove(compressed_file_path)
+        if audio_file_path and os.path.exists(audio_file_path):
+            os.remove(audio_file_path)

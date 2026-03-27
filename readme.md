@@ -4,7 +4,10 @@
 
 ### Comando para iniciar el proyecto
  ABRIR 2 TERMINALES 
- EN EL PRIMER TERMINAL: 
+ - EN EL PRIMER TERMINAL: 
     - python manage.py runserver
- EN LA PRIMER TERMINAL: 
+ - EN EL SEGUNDO TERMINAL: 
     - celery -A gemini_api worker -l INFO --pool=solo
+
+
+### Tener levanto el docker (run) e iniciar el servicio de redis
