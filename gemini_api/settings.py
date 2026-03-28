@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+# Carga las variables del archivo .env al entorno de Python
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -84,9 +88,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'mssql',
         'NAME': 'process-ia-video',
-        'USER': 'sa',
-        'PASSWORD': '2025',
-        'HOST': r'DESKTOP-J3VGBST\MSSQLSERVER1',
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',

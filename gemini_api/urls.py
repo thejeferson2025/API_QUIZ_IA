@@ -7,9 +7,9 @@ from drf_yasg import openapi
 # Configuración visual de tu página de Swagger
 schema_view = get_schema_view(
    openapi.Info(
-      title="IA Quiz API",
+      title="API Questionnaire IA",
       default_version='v1',
-      description="API educativa para generar cuestionarios a partir de videos.",
+      description="API para generar cuestionarios a partir de videos con inteligencia artificial",
       contact=openapi.Contact(email="tu@email.com"),
    ),
    public=True,
