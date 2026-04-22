@@ -26,7 +26,6 @@ def extraer_audio_ffmpeg(input_path):
     """
     Extrae únicamente la pista de audio del video y la guarda como MP3.
     """
-    # Generamos el nombre del archivo de salida pero con extensión .mp3
     output_path = input_path.replace('.mp4', '.mp3')
     
     comando = [
@@ -45,8 +44,12 @@ def extraer_audio_ffmpeg(input_path):
         error_msg = e.stderr.decode('utf-8')
         raise Exception(f"Error extrayendo el audio con FFmpeg: {error_msg}")
 
-@shared_task
-def procesar_video_gemini(video_quiz_id, file_path, num_preguntas=4):
+
+# --- AQUÍ EMPIEZAN LOS CAMBIOS DE NIVEL SENIOR ---
+# bind=True permite acceder a "self" (la tarea en sí)
+# max_retries=3 le dice a Celery que intente máximo 3 veces antes de rendirse
+@shared_task(bind=True, max_retries=3)
+def procesar_video_gemini(self, video_quiz_id, file_path, num_preguntas=4):
     quiz_record = VideoQuiz.objects.get(id=video_quiz_id)
     
     # --- ESCUDO PROTECTOR CONTRA EJECUCIONES FANTASMAS ---
@@ -54,12 +57,14 @@ def procesar_video_gemini(video_quiz_id, file_path, num_preguntas=4):
         return "El video ya fue procesado exitosamente. Evitando re-ejecución."
     # -----------------------------------------------------
 
-    # Limpiamos posibles errores anteriores si es un reintento legítimo
     quiz_record.status = 'PROCESSING'
     quiz_record.error_message = None 
     quiz_record.save()
 
     audio_file_path = None
+    
+    # NUEVO: Control para no borrar los archivos si vamos a reintentar
+    debe_borrar_archivos = True 
 
     try:
         audio_file_path = extraer_audio_ffmpeg(file_path)
@@ -109,12 +114,34 @@ def procesar_video_gemini(video_quiz_id, file_path, num_preguntas=4):
         quiz_record.save()
 
     except Exception as e:
-        quiz_record.status = 'FAILED'
-        quiz_record.error_message = str(e)
-        quiz_record.save()
+        error_str = str(e)
+        
+        # Detectamos si es un error de servidores saturados de Google (503, 429 o UNAVAILABLE)
+        errores_saturacion = ["503", "UNAVAILABLE", "429", "Too Many Requests"]
+        es_saturacion = any(err in error_str for err in errores_saturacion)
+        
+        if es_saturacion:
+            # Protegemos los archivos de video y audio para que el reintento los pueda usar
+            debe_borrar_archivos = False 
+            
+            # Avisamos en la base de datos que estamos reintentando
+            numero_intento = self.request.retries + 1
+            quiz_record.error_message = f"Servidores de Google saturados. Reintentando en 60s... (Intento {numero_intento}/3)"
+            quiz_record.save()
+            
+            # Lanzamos el reintento (countdown=60 significa esperar 1 minuto)
+            raise self.retry(exc=e, countdown=60)
+            
+        else:
+            # Si el error es otro (ej. archivo dañado), cancelamos definitivamente
+            quiz_record.status = 'FAILED'
+            quiz_record.error_message = error_str
+            quiz_record.save()
     
     finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        if audio_file_path and os.path.exists(audio_file_path):
-            os.remove(audio_file_path)
+        # Solo limpiamos el disco duro si terminamos con éxito o fallamos definitivamente
+        if debe_borrar_archivos:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            if audio_file_path and os.path.exists(audio_file_path):
+                os.remove(audio_file_path)

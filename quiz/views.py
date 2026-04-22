@@ -7,7 +7,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.shortcuts import get_object_or_404
 
-from .models import VideoQuiz
+# IMPORTANTE: Agregar Asignatura a las importaciones
+from .models import VideoQuiz, Asignatura
 from .tasks import procesar_video_gemini
 
 @swagger_auto_schema(
@@ -21,18 +22,26 @@ from .tasks import procesar_video_gemini
             type=openapi.TYPE_FILE,
             required=True
         ),
-        # --- PARÁMETRO AHORA ES OBLIGATORIO ---
         openapi.Parameter(
             name='num_preguntas',
             in_=openapi.IN_FORM,
             description='Cantidad de preguntas a generar a lo largo del video (Ej: 10, 15, 20)',
             type=openapi.TYPE_INTEGER,
-            required=True # <--- Esto pone el asterisco rojo en Swagger
+            required=True 
+        ),
+        # --- NUEVO PARÁMETRO EN SWAGGER ---
+        openapi.Parameter(
+            name='asignatura_id',
+            in_=openapi.IN_FORM,
+            description='ID de la Asignatura a la que pertenece este video',
+            type=openapi.TYPE_INTEGER,
+            required=True 
         )
     ],
     responses={
         202: "Video aceptado y en proceso",
-        400: "Error en la validación o formato incorrecto"
+        400: "Error en la validación o formato incorrecto",
+        404: "Asignatura no encontrada"
     }
 )
 @api_view(['POST'])
@@ -48,7 +57,6 @@ def generar_cuestionario(request):
         return Response({
             "error": "Formato no admitido. Por favor, sube únicamente videos en formato .mp4"
         }, status=400)
-    # ---------------------------
     
     # --- VALIDACIÓN ESTRICTA DE NÚMERO DE PREGUNTAS ---
     if 'num_preguntas' not in request.data:
@@ -60,12 +68,25 @@ def generar_cuestionario(request):
              return Response({"error": "La cantidad de preguntas debe ser mayor a cero."}, status=400)
     except (ValueError, TypeError):
         return Response({"error": "El parámetro 'num_preguntas' debe ser un número entero válido."}, status=400)
+        
+    # --- NUEVO: VALIDACIÓN DE ASIGNATURA ---
+    asignatura_id = request.data.get('asignatura_id')
+    asignatura_obj = None
+    
+    if asignatura_id:
+        try:
+            asignatura_obj = Asignatura.objects.get(id=asignatura_id)
+        except Asignatura.DoesNotExist:
+            return Response({"error": f"La asignatura con ID {asignatura_id} no existe en la base de datos."}, status=404)
+    else:
+        return Response({"error": "El parámetro 'asignatura_id' es obligatorio."}, status=400)
     # --------------------------------------------------
     
-    # 1. Creamos el registro en SQL Server (Estado: PENDING)
+    # 1. Creamos el registro vinculando la Asignatura
     quiz_record = VideoQuiz.objects.create(
         video_name=video_file.name,
-        status='PENDING'
+        status='PENDING',
+        asignatura=asignatura_obj # <--- Aquí guardamos el ID
     )
     
     # 2. Guardamos el archivo de forma temporal en el disco
@@ -81,6 +102,7 @@ def generar_cuestionario(request):
     return Response({
         "mensaje": "Video subido correctamente y encolado para procesamiento.",
         "id_registro": quiz_record.id,
+        "asignatura": asignatura_obj.nombre, # <--- Mostramos la materia para confirmar
         "preguntas_solicitadas": num_preguntas,
         "status": quiz_record.status
     }, status=202)
@@ -97,9 +119,19 @@ def generar_cuestionario(request):
 def consultar_estado_cuestionario(request, pk):
     quiz_record = get_object_or_404(VideoQuiz, pk=pk)
     
+    # --- NUEVO: Extraer datos de la asignatura si el video la tiene ---
+    asignatura_info = None
+    if quiz_record.asignatura:
+        asignatura_info = {
+            "id": quiz_record.asignatura.id,
+            "materia": quiz_record.asignatura.nombre,
+            "carrera": quiz_record.asignatura.carrera.nombre
+        }
+    
     return Response({
         "id": quiz_record.id,
         "video_name": quiz_record.video_name,
+        "info_academica": asignatura_info, # <--- Agregamos la información aquí
         "status": quiz_record.status,
         "data": quiz_record.quiz_data,
         "error_message": quiz_record.error_message
