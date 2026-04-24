@@ -6,8 +6,6 @@ from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.shortcuts import get_object_or_404
-
-# IMPORTANTE: Agregar Asignatura a las importaciones
 from .models import VideoQuiz, Asignatura
 from .tasks import procesar_video_gemini
 
@@ -29,7 +27,6 @@ from .tasks import procesar_video_gemini
             type=openapi.TYPE_INTEGER,
             required=True 
         ),
-        # --- NUEVO PARÁMETRO EN SWAGGER ---
         openapi.Parameter(
             name='asignatura_id',
             in_=openapi.IN_FORM,
@@ -80,16 +77,14 @@ def generar_cuestionario(request):
             return Response({"error": f"La asignatura con ID {asignatura_id} no existe en la base de datos."}, status=404)
     else:
         return Response({"error": "El parámetro 'asignatura_id' es obligatorio."}, status=400)
-    # --------------------------------------------------
-    
+
     # 1. Creamos el registro vinculando la Asignatura
     quiz_record = VideoQuiz.objects.create(
         video_name=video_file.name,
         status='PENDING',
-        asignatura=asignatura_obj # <--- Aquí guardamos el ID
+        asignatura=asignatura_obj
     )
-    
-    # 2. Guardamos el archivo de forma temporal en el disco
+    # 2. Guardamos el video temporalmente en el servidor
     fd, temp_path = tempfile.mkstemp(suffix=".mp4")
     with os.fdopen(fd, 'wb') as f:
         for chunk in video_file.chunks():
@@ -102,7 +97,7 @@ def generar_cuestionario(request):
     return Response({
         "mensaje": "Video subido correctamente y encolado para procesamiento.",
         "id_registro": quiz_record.id,
-        "asignatura": asignatura_obj.nombre, # <--- Mostramos la materia para confirmar
+        "asignatura": asignatura_obj.nombre,
         "preguntas_solicitadas": num_preguntas,
         "status": quiz_record.status
     }, status=202)
@@ -119,7 +114,6 @@ def generar_cuestionario(request):
 def consultar_estado_cuestionario(request, pk):
     quiz_record = get_object_or_404(VideoQuiz, pk=pk)
     
-    # --- NUEVO: Extraer datos de la asignatura si el video la tiene ---
     asignatura_info = None
     if quiz_record.asignatura:
         asignatura_info = {
@@ -131,7 +125,7 @@ def consultar_estado_cuestionario(request, pk):
     return Response({
         "id": quiz_record.id,
         "video_name": quiz_record.video_name,
-        "info_academica": asignatura_info, # <--- Agregamos la información aquí
+        "info_academica": asignatura_info, 
         "status": quiz_record.status,
         "data": quiz_record.quiz_data,
         "error_message": quiz_record.error_message

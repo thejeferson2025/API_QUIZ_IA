@@ -9,5 +9,5 @@ app = Celery('gemini_api')
 # Lee la configuración de Django buscando variables que empiecen con 'CELERY_'
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
-# Descubre automáticamente las tareas en todos los archivos 'tasks.py' de tus apps
+# Descubre automáticamente las tareas en todos los archivos 'tasks.py' de la app
 app.autodiscover_tasks()

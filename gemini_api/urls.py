@@ -4,7 +4,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-# Configuración visual de tu página de Swagger
+# Configuración visual de Swagger
 schema_view = get_schema_view(
    openapi.Info(
       title="API Questionnaire IA",
@@ -18,7 +18,7 @@ schema_view = get_schema_view(
 
 urlpatterns =[
     path('admin/', admin.site.urls),
-    path('api/', include('quiz.urls')), # Tu API real
+    path('api/', include('quiz.urls')),
     
     # --- Rutas para la documentación interactiva ---
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

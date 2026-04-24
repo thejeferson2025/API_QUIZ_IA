@@ -45,25 +45,18 @@ def extraer_audio_ffmpeg(input_path):
         raise Exception(f"Error extrayendo el audio con FFmpeg: {error_msg}")
 
 
-# --- AQUÍ EMPIEZAN LOS CAMBIOS DE NIVEL SENIOR ---
-# bind=True permite acceder a "self" (la tarea en sí)
-# max_retries=3 le dice a Celery que intente máximo 3 veces antes de rendirse
 @shared_task(bind=True, max_retries=3)
 def procesar_video_gemini(self, video_quiz_id, file_path, num_preguntas=4):
     quiz_record = VideoQuiz.objects.get(id=video_quiz_id)
     
-    # --- ESCUDO PROTECTOR CONTRA EJECUCIONES FANTASMAS ---
     if quiz_record.status == 'COMPLETED':
         return "El video ya fue procesado exitosamente. Evitando re-ejecución."
-    # -----------------------------------------------------
-
+ 
     quiz_record.status = 'PROCESSING'
     quiz_record.error_message = None 
     quiz_record.save()
 
     audio_file_path = None
-    
-    # NUEVO: Control para no borrar los archivos si vamos a reintentar
     debe_borrar_archivos = True 
 
     try:
@@ -116,30 +109,25 @@ def procesar_video_gemini(self, video_quiz_id, file_path, num_preguntas=4):
     except Exception as e:
         error_str = str(e)
         
-        # Detectamos si es un error de servidores saturados de Google (503, 429 o UNAVAILABLE)
+        # Detectamos si hay error de servidores 
         errores_saturacion = ["503", "UNAVAILABLE", "429", "Too Many Requests"]
         es_saturacion = any(err in error_str for err in errores_saturacion)
         
         if es_saturacion:
-            # Protegemos los archivos de video y audio para que el reintento los pueda usar
-            debe_borrar_archivos = False 
-            
-            # Avisamos en la base de datos que estamos reintentando
+            debe_borrar_archivos = False            
             numero_intento = self.request.retries + 1
             quiz_record.error_message = f"Servidores de Google saturados. Reintentando en 60s... (Intento {numero_intento}/3)"
-            quiz_record.save()
-            
-            # Lanzamos el reintento (countdown=60 significa esperar 1 minuto)
+            quiz_record.save()           
             raise self.retry(exc=e, countdown=60)
             
         else:
-            # Si el error es otro (ej. archivo dañado), cancelamos definitivamente
+            # Captura el error 
             quiz_record.status = 'FAILED'
             quiz_record.error_message = error_str
             quiz_record.save()
     
     finally:
-        # Solo limpiamos el disco duro si terminamos con éxito o fallamos definitivamente
+        # limpiamos si terminamos con éxito o fallamos definitivamente
         if debe_borrar_archivos:
             if os.path.exists(file_path):
                 os.remove(file_path)

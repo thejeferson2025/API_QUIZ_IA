@@ -19,10 +19,6 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-g2=emxx5uf(a^z%!+w@i9ninfe4k9f!s!8+hzraxg2*s-6l@*3'
 
@@ -41,12 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-       
-    # --- Nuevas librerías ---
     'rest_framework', 
     'drf_yasg',
-    
-    # --- Tu app ---
     'quiz',
 ]
 
