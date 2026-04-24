@@ -1,0 +1,44 @@
+services:
+  # 1. El Broker (Redis)
+  redis:
+    image: redis:alpine
+    container_name: quiz_redis
+    ports:
+      - "6379:6379"
+
+  # 2. Tu Servidor Django
+  web:
+    build: .
+    container_name: quiz_django
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # NUEVO: Conectamos la carpeta /tmp del contenedor al volumen compartido
+    volumes:
+      - archivos_temporales:/tmp
+
+  # 3. El Worker Asíncrono (Celery)
+  celery:
+    build: .
+    container_name: quiz_celery
+    command: celery -A gemini_api worker -l INFO --pool=solo
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # NUEVO: Conectamos la misma carpeta para que Celery vea el video
+    volumes:
+      - archivos_temporales:/tmp
+
+# NUEVO: Declaramos el volumen compartido a nivel global
+volumes:
+  archivos_temporales:

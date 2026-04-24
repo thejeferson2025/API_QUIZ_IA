@@ -1,60 +1,58 @@
-# API Generador de Cuestionarios Interactivos con IA
+# API Generador de Cuestionarios Interactivos con IA 🤖📹
 
-Este proyecto es una API RESTful desarrollada con Django y Python que permite la generación automatizada de cuestionarios interactivos a partir de videos de clases magistrales. Utiliza un enfoque asíncrono (Celery + Redis) para procesar archivos multimedia pesados y se integra con la API de Google Gemini para el análisis de contenido.
+Este proyecto es una API RESTful desarrollada con Django y Python que permite la generación automatizada de cuestionarios interactivos a partir de videos de clases magistrales.
+
+Utiliza una arquitectura orquestada mediante Contenedores (Docker) e implementa un enfoque asíncrono (Celery + Redis) para el procesamiento de archivos multimedia pesados, integrándose con la API de Google Gemini para el análisis profundo de contenido educativo.
 
 ## 🛠️ Requisitos Previos
 
-Antes de clonar el proyecto, asegúrate de tener instalado en tu sistema:
-- **Python:** 3.13.2
-- **Docker Desktop** (Para levantar el servidor de Redis).
-- **SQL Server** (Para la base de datos relacional).
-- **FFmpeg:** Configurado en las variables de entorno de tu sistema operativo.
+Gracias a la orquestación con Docker Compose, no necesitas instalar Python ni FFmpeg localmente, el entorno está completamente encapsulado.  
+Solo asegúrate de tener en tu sistema:
+
+- **Docker Desktop** (Obligatorio, con el motor en ejecución).
+- **SQL Server** (Instalado localmente, con el modo de autenticación mixta/SQL Server habilitado,  tener una base de datos, un usuario y una contraseña activos).
+- **Git** (Para clonar el repositorio).
 
 ## ⚙️ Instalación y Configuración
 
-**1. Clonar el repositorio y entrar al directorio:**  
+**1. Clonar el repositorio, entrar al directorio y abrirlo en VS Code:**  
+
 ```bash
 git clone https://github.com/thejeferson2025/API_QUIZ_IA.git
 cd API_QUIZ_IA
-```
-**2. Crear y activar un entorno virtual:**  
-```bash
-# En Windows:
-python -m venv .venv
-.venv\Scripts\activate
+code .
 ```
 
-**3. Instalar las dependencias del proyecto:**  
-```bash
-pip install -r requirements.txt
-```
-**4. Configurar Variables de Entorno:**  
-Crea un archivo llamado .env en la raíz del proyecto basándote en el archivo **.env.template** y añade tu clave de API de Gemini y las credenciales de tu SQL Server.
+**2. Configurar las Variables de Entorno:**  
+Crea un archivo llamado `.env` en la raíz del proyecto basándote en el archivo `.env.template`. Solo necesitas modificar 4 datos clave:
+- `GEMINI_API_KEY`: Tu clave de acceso de Google AI Studio.
+- `DB_NAME`: El nombre de tu base de datos SQL Server.
+- `DB_USER`: El usuario de tu base de datos SQL Server activo.
+- `DB_PASSWORD`: La contraseña de tu usuario SQL Server activo.
 
- - Levantando el Broker (Redis con Docker)
-El sistema necesita Redis para gestionar la cola de tareas en segundo plano. Si ya tienes Docker Desktop abierto, ejecuta el siguiente comando para descargar y correr un contenedor de Redis en el puerto por defecto (6379):
+*(Nota: Las variables de conexión de Docker como `DB_HOST` y `CELERY_BROKER_URL` ya están configuradas correctamente por defecto).*
+
+## 🚀 Ejecución del Proyecto (Docker Compose)
+
+El sistema levanta automáticamente el servidor web (Django), el worker asíncrono (Celery), el broker de mensajes (Redis) y prepara el entorno de procesamiento (FFmpeg) con un solo comando.
+
+Abre tu terminal en la raíz del proyecto y ejecuta:
 ```bash
-docker run --name redis_broker -p 6379:6379 -d redis
+docker compose up --build
 ```
-***(Nota: Si detienes el contenedor, puedes volver a iniciarlo desde la interfaz de Docker Desktop o con el comando docker start redis_broker).***
-- Base de Datos y Migraciones
-Una vez que tengas tu SQL Server corriendo y configurado en el proyecto, prepara la base de datos ejecutando las migraciones:
+*(Nota: La primera vez tomará algunos minutos mientras construye las imágenes y descarga las dependencias. Las ejecuciones posteriores serán casi inmediatas).*
+
+
+## 🗄️ Migraciones de la Base de Datos
+`Nota: Debes tener creada la base de datos y configurada en las variables de entorno`   
+Una vez que los contenedores estén corriendo, debes preparar las tablas en tu SQL Server. Abre una nueva terminal (sin detener la que está corriendo Docker) y ejecuta:
+
 ```bash
-python manage.py makemigrations
-python manage.py migrate
+docker compose exec web python manage.py makemigrations
+docker compose exec web python manage.py migrate
 ```
 
-## 🚀 Ejecución del Proyecto
-Para que el sistema funcione correctamente, necesitas ejecutar el servidor web y el worker asíncrono en dos terminales separadas (ambas con el entorno virtual activado):
-
-Terminal 1 (Servidor de Django):
-```bash
-python manage.py runserver
-```
-Terminal 2 (Celery Worker):
-```bash
-celery -A gemini_api worker -l INFO --pool=solo
-```
 ## 📄 Documentación de la API
-Una vez que el proyecto esté corriendo, puedes acceder a la interfaz interactiva de la API (Swagger) visitando:  
-http://127.0.0.1:8000/swagger/
+Cuando la terminal indique que los servicios están listos, puedes probar el sistema completo y acceder a la interfaz interactiva de la API (Swagger) visitando: 
+
+👉 http://127.0.0.1:8000/swagger/

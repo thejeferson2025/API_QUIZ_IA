@@ -74,7 +74,6 @@ WSGI_APPLICATION = 'gemini_api.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 # --- Base de Datos: SQL Server ---
 DATABASES = {
     'default': {
@@ -86,14 +85,14 @@ DATABASES = {
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
-            'extra_params': 'Trusted_Connection=yes;'
         },
     }
 }
 
 # --- Configuración de Celery ---
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+# Usamos os.getenv para que lea el .env de Docker
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
