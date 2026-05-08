@@ -40,11 +40,11 @@ Abre tu terminal en la raíz del proyecto y ejecuta:
 ```bash
 docker compose up --build
 ```
-*(Nota: La primera vez tomará algunos minutos mientras construye las imágenes y descarga las dependencias. Las ejecuciones posteriores serán casi inmediatas).*
+*(Nota: Tener en cuenta que debe estar configurada correctamente las variables de entorno .env para que corra el comando correctamente, La primera vez tomará algunos minutos mientras construye las imágenes y descarga las dependencias. Las ejecuciones posteriores serán casi inmediatas).*
 
 
 ## 🗄️ Migraciones de la Base de Datos
-`Nota: Debes tener creada la base de datos y configurada en las variables de entorno`   
+`Nota: Debes tener creada la base de datos y configurada en las variables de entorno .env`   
 Una vez que los contenedores estén corriendo, debes preparar las tablas en tu SQL Server. Abre una nueva terminal (sin detener la que está corriendo Docker) y ejecuta:
 
 ```bash
