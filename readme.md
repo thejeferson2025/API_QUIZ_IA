@@ -44,7 +44,7 @@ docker compose up --build
 
 
 ## 🗄️ Migraciones de la Base de Datos
-`Nota: Debes tener creada la base de datos y configurada en las variables de entorno .env`   
+Nota: Debes tener creada la base de datos `"process-ia-video" en tu sql server y configuradas las variables de entorno ".env"`   
 Una vez que los contenedores estén corriendo, debes preparar las tablas en tu SQL Server. Abre una nueva terminal (sin detener la que está corriendo Docker) y ejecuta:
 
 ```bash
