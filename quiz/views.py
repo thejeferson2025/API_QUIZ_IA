@@ -66,7 +66,7 @@ def generar_cuestionario(request):
     except (ValueError, TypeError):
         return Response({"error": "El parámetro 'num_preguntas' debe ser un número entero válido."}, status=400)
         
-    # --- NUEVO: VALIDACIÓN DE ASIGNATURA ---
+    # --- VALIDACIÓN DE ASIGNATURA ---
     asignatura_id = request.data.get('asignatura_id')
     asignatura_obj = None
     
